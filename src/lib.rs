@@ -7,6 +7,10 @@ pub struct JsonSchemaProperty {
 }
 
 pub struct JsonSchema {
+	pub schema: String,
+	pub id: String,
+	pub title: Option<String>,
+	pub description: Option<String>,
 	pub properties: HashMap<String, JsonSchemaProperty>,
 	pub required: Vec<String>,
 }
@@ -14,17 +18,48 @@ pub struct JsonSchema {
 pub fn build_schema(data: &str) -> Result<JsonSchema> {
 	let v: Value = serde_json::from_str(data)?;
 
-	// TODO: collect values above and map them into JsonShema instances
+	let properties: HashMap<String, JsonSchemaProperty> = match v {
+		Value::Object(x) => HashMap::from_iter(x.into_iter().map(|(key, value)| {
+			(
+				key,
+				JsonSchemaProperty {
+					r#type: value_to_type(value),
+				},
+			)
+		})),
+		_ => HashMap::new(),
+	};
 
 	Ok(JsonSchema {
-		properties: HashMap::from([(
-			String::from("name"),
-			JsonSchemaProperty {
-				r#type: String::from("string"),
-			},
-		)]),
+		schema: String::from("https://json-schema.org/draft/2020-12/schema"),
+		id: String::from(""),
+		title: None,
+		description: None,
+		properties,
 		required: vec![],
 	})
+}
+
+fn value_to_type(value: Value) -> String {
+	if value.is_i64() || value.is_u64() {
+		String::from("integer")
+	} else if value.is_f64() {
+		String::from("float")
+	} else if value.is_number() {
+		String::from("number")
+	} else if value.is_array() {
+		String::from("array")
+	} else if value.is_string() {
+		String::from("string")
+	} else if value.is_boolean() {
+		String::from("boolean")
+	} else if value.is_null() {
+		String::from("null")
+	} else if value.is_object() {
+		String::from("object")
+	} else {
+		String::from("unknown")
+	}
 }
 
 #[cfg(test)]
@@ -45,7 +80,9 @@ mod tests {
 
 		let output = build_schema(data).expect("Could not parse json");
 
-		assert_eq!(output.properties["name"].r#type, "string")
+		assert_eq!(output.properties["name"].r#type, "string");
+		assert_eq!(output.properties["phones"].r#type, "array");
+		assert_eq!(output.properties["age"].r#type, "integer")
 	}
 
 	#[test]
